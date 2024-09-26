@@ -54,11 +54,6 @@ void countPrimesMultithread(uint8_t *b_primes, uint64_t start, uint64_t end, uin
         }
     }
 
-   /* for (uint64_t i = limit+1; i <= end; ++i) {
-        if(b_primes[i])
-            ++lcount;
-    }*/
-
     *count = lcount;
 }
 

@@ -16,7 +16,6 @@ bool isPrime(uint64_t n)
         if(n%i == 0)
             return false;
     }
-
     return true;
 }
 
@@ -29,7 +28,6 @@ uint64_t countPrimes(uint64_t n)
         if(isPrime(i))
             ++count;
     }
-
     return count;
 }
 
