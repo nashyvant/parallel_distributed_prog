@@ -1,3 +1,12 @@
+/*
+ * Problem Statement:
+ * Write a multithreaded dictionary (2-4 threads) that splits the 110 books in
+ * https://github.com/RU-ECE/ECE451-Parallel/tree/main/data/books. Assuming 4 threads,
+ * each thread should read in 1/4 of the books and build a dictionary showing the number of times the word appears.
+ * At the end, you will have 4 dictionaries in parallel.Merge the 4 dictonaries. Output should be:
+ * 1. The number of words (after throwing out words with only 1 occurrence)
+ * 2. Output the top k=300 words(sort the words by frequency, and print the top 300 most-frequent words)
+ */
 #include <iostream>
 #include <cmath>
 #include <cstdint>
@@ -12,29 +21,29 @@
 #include <sstream>
 #include <stack>
 #include <mutex>
+#include <queue>
 
 using namespace std;
 
 namespace fs = std::filesystem;
+atomic<uint32_t> book_num(0); 
 mutex mtx;
 
-void threadReadsBook(int thread_num, unordered_map<string, uint64_t>& word_count, stack<std::string>& fileNames)
+void threadReadsBook(int thread_num, unordered_map<string, uint64_t>& word_count, vector<std::string> fileNames)
 {
     while(true)
     {
         std::vector<std::string> fileContents;
         string local_file = "";
         mtx.lock();
-        if (!fileNames.empty())
-        {
-            local_file = fileNames.top();
-            fileNames.pop();
-        }
-        else
+        uint32_t temp = book_num.load();
+        if(temp >= fileNames.size())
         {
             mtx.unlock();
             return; //no more files to process
         }
+        local_file = fileNames[temp];
+        book_num.store(temp+1);//let the thread process next book in the next iteration
         mtx.unlock();
         
         std::ifstream file(local_file); 
@@ -62,12 +71,12 @@ void threadReadsBook(int thread_num, unordered_map<string, uint64_t>& word_count
 
 int main() {
     std::string folderPath = "C:\\Users\\Anusha\\repos\\parallel_distributed_prog\\data\\books";
-    std::stack<std::string> fileNames;
+    vector<std::string> fileNames;
     
     // Read all file names from the folder
     for (const auto& entry : fs::directory_iterator(folderPath)) {
         if (entry.is_regular_file()) {
-            fileNames.push(entry.path().string());
+            fileNames.push_back(entry.path().string());
         }
     }
     
@@ -76,27 +85,81 @@ int main() {
     unordered_map<string, uint64_t> word_count3;
     unordered_map<string, uint64_t> word_count4;
 
-    thread t1(threadReadsBook, 1, std::ref(word_count1), std::ref(fileNames));
-    thread t2(threadReadsBook, 2, std::ref(word_count2), std::ref(fileNames));
-    thread t3(threadReadsBook, 3, std::ref(word_count3), std::ref(fileNames));
-    thread t4(threadReadsBook, 4, std::ref(word_count4), std::ref(fileNames));
+    thread t1(threadReadsBook, 1, std::ref(word_count1), fileNames);
+    thread t2(threadReadsBook, 2, std::ref(word_count2), fileNames);
+    thread t3(threadReadsBook, 3, std::ref(word_count3), fileNames);
+    thread t4(threadReadsBook, 4, std::ref(word_count4), fileNames);
     
     t1.join(); 
     t2.join(); 
     t3.join(); 
     t4.join();
 
-    uint64_t total_num_words = 0;
-    for(auto it = word_count1.begin(); it != word_count1.end(); ++it)
-        total_num_words += it->second;
+    //add all words to 1st dictionary; alternatively, I can find the biggest and add to that instead
+    cout<<"Finished parsing words in all files\n";
+
     for(auto it = word_count2.begin(); it != word_count2.end(); ++it)
-        total_num_words += it->second;
+        word_count1[it->first] += it->second;
+    word_count2.clear();
+
     for(auto it = word_count3.begin(); it != word_count3.end(); ++it)
-        total_num_words += it->second;
+        word_count1[it->first]+= it->second;
+    word_count3.clear();
+
     for(auto it = word_count4.begin(); it != word_count4.end(); ++it)
-        total_num_words += it->second;
+        word_count1[it->first]+= it->second;
+    word_count4.clear();
 
-    cout<<"Total words:"<<total_num_words<<endl;
+    cout<<"\nMerged all 4 dictionaries into one main dictionary!\n";
 
+    uint64_t total_num_words = 0;
+    auto it = word_count1.begin();
+    while( it != word_count1.end())
+    {
+        if(it->second == 1)
+            it = word_count1.erase(it);
+        else   
+        {
+            total_num_words += it->second;
+            ++it;
+        }
+    }
+
+    cout<<"Erased single entries from the main dictionary and found total words:"<<total_num_words<<"\n";
+
+    /*
+     * Finding top most used 300 words in the dictionary 
+     */
+    priority_queue<pair<int, string>> pq;
+    const uint32_t topK = 300;
+    for(auto it = word_count1.begin(); it != word_count1.end(); ++it)
+    {
+        if(pq.size() < topK)
+        {
+            pq.push(make_pair(it->second*-1, it->first));//multiply by -1 to make it min heap
+        }
+        else
+        {
+            uint32_t curr_least_freq = pq.top().first*-1;//make it positive
+            if(it->second > curr_least_freq)
+            {
+                pq.pop();//remove the least frequently used from the PQ
+                pq.push(make_pair(it->second*-1, it->first));
+            }
+        }
+    }
+    
+    cout<<topK<<" most used words in the text files are: \n";
+    uint16_t i = 0;
+    uint64_t max = 0;
+    while(!pq.empty())
+    {
+        pair<int, string> top_ele = pq.top();
+        cout<<++i<<"] "<<top_ele.second<<" "<<top_ele.first*-1<<"\n";
+        max = top_ele.first*-1;
+        pq.pop();
+    }
+
+    cout<<"ALL DONE!\n";
     return 0;
 }
