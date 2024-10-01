@@ -69,35 +69,14 @@ void threadReadsBook(int thread_num, unordered_map<string, uint64_t>& word_count
     }
 }
 
-int main() {
-    std::string folderPath = "C:\\Users\\Anusha\\repos\\parallel_distributed_prog\\data\\books";
-    vector<std::string> fileNames;
+/*
+ * merge dictionary 2,3,4 to 1 */
+void mergeDicts(unordered_map<string, uint64_t>& word_count1, 
+                unordered_map<string, uint64_t>& word_count2, 
+                unordered_map<string, uint64_t>& word_count3, 
+                unordered_map<string, uint64_t>& word_count4)
+{
     
-    // Read all file names from the folder
-    for (const auto& entry : fs::directory_iterator(folderPath)) {
-        if (entry.is_regular_file()) {
-            fileNames.push_back(entry.path().string());
-        }
-    }
-    
-    unordered_map<string, uint64_t> word_count1;
-    unordered_map<string, uint64_t> word_count2;
-    unordered_map<string, uint64_t> word_count3;
-    unordered_map<string, uint64_t> word_count4;
-
-    thread t1(threadReadsBook, 1, std::ref(word_count1), fileNames);
-    thread t2(threadReadsBook, 2, std::ref(word_count2), fileNames);
-    thread t3(threadReadsBook, 3, std::ref(word_count3), fileNames);
-    thread t4(threadReadsBook, 4, std::ref(word_count4), fileNames);
-    
-    t1.join(); 
-    t2.join(); 
-    t3.join(); 
-    t4.join();
-
-    //add all words to 1st dictionary; alternatively, I can find the biggest and add to that instead
-    cout<<"Finished parsing words in all files\n";
-
     for(auto it = word_count2.begin(); it != word_count2.end(); ++it)
         word_count1[it->first] += it->second;
     word_count2.clear();
@@ -109,30 +88,12 @@ int main() {
     for(auto it = word_count4.begin(); it != word_count4.end(); ++it)
         word_count1[it->first]+= it->second;
     word_count4.clear();
+}
 
-    cout<<"\nMerged all 4 dictionaries into one main dictionary!\n";
-
-    uint64_t total_num_words = 0;
-    auto it = word_count1.begin();
-    while( it != word_count1.end())
-    {
-        if(it->second == 1)
-            it = word_count1.erase(it);
-        else   
-        {
-            total_num_words += it->second;
-            ++it;
-        }
-    }
-
-    cout<<"Erased single entries from the main dictionary and found total words:"<<total_num_words<<"\n";
-
-    /*
-     * Finding top most used 300 words in the dictionary 
-     */
+void printTopKMostUsedWords(unordered_map<string, uint64_t> &word_count, const uint16_t topK)
+{
     priority_queue<pair<int, string>> pq;
-    const uint32_t topK = 300;
-    for(auto it = word_count1.begin(); it != word_count1.end(); ++it)
+    for(auto it = word_count.begin(); it != word_count.end(); ++it)
     {
         if(pq.size() < topK)
         {
@@ -159,7 +120,51 @@ int main() {
         max = top_ele.first*-1;
         pq.pop();
     }
+}
 
+int main() {
+    std::string folderPath = "C:\\Users\\Anusha\\repos\\parallel_distributed_prog\\data\\books";
+    vector<std::string> fileNames;
+    
+    // Read all file names from the folder
+    for (const auto& entry : fs::directory_iterator(folderPath)) {
+        if (entry.is_regular_file()) {
+            fileNames.push_back(entry.path().string());
+        }
+    }
+    
+    unordered_map<string, uint64_t> word_count1, word_count2, word_count3, word_count4;
+
+    thread t1(threadReadsBook, 1, std::ref(word_count1), fileNames);
+    thread t2(threadReadsBook, 2, std::ref(word_count2), fileNames);
+    thread t3(threadReadsBook, 3, std::ref(word_count3), fileNames);
+    thread t4(threadReadsBook, 4, std::ref(word_count4), fileNames);
+    
+    t1.join(); t2.join(); t3.join(); t4.join();
+
+    //add all words to 1st dictionary; alternatively, I can find the biggest and add to that instead
+    cout<<"Finished parsing words in all files\n";
+    mergeDicts(word_count1, word_count2, word_count3, word_count4);
+    cout<<"\nMerged all 4 dictionaries into one main dictionary!\n";
+
+    uint64_t total_num_words = 0;
+    auto it = word_count1.begin();
+    while( it != word_count1.end())
+    {
+        if(it->second == 1)
+            it = word_count1.erase(it);
+        else   
+        {
+            total_num_words += it->second;
+            ++it;
+        }
+    }
+    cout<<"Erased single entries from the main dictionary and found total words:"<<total_num_words<<"\n";
+    /*
+     * Finding top most used 300 words in the dictionary 
+     */
+    const uint32_t topK = 300;
+    printTopKMostUsedWords(word_count1, topK);
     cout<<"ALL DONE!\n";
     return 0;
 }
