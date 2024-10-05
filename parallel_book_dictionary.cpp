@@ -6,6 +6,9 @@
  * At the end, you will have 4 dictionaries in parallel.Merge the 4 dictonaries. Output should be:
  * 1. The number of words (after throwing out words with only 1 occurrence)
  * 2. Output the top k=300 words(sort the words by frequency, and print the top 300 most-frequent words)
+ * Output completion timings on Linux:
+ * single thread: 3600 ms, 2 threads: 2300 ms, 4 threads: 1700 ms
+ * The program was running on VirtualBox with 4 GB base memory and 4 cores(including logical cores) 
  */
 #include <iostream>
 #include <cmath>
@@ -123,25 +126,30 @@ void printTopKMostUsedWords(unordered_map<string, uint64_t> &word_count, const u
 }
 
 int main() {
-    std::string folderPath = "C:\\Users\\Anusha\\repos\\parallel_distributed_prog\\data\\books";
+    auto start = std::chrono::high_resolution_clock::now();
+    std::string folderPath = "books";
     vector<std::string> fileNames;
-    
+
     // Read all file names from the folder
     for (const auto& entry : fs::directory_iterator(folderPath)) {
         if (entry.is_regular_file()) {
             fileNames.push_back(entry.path().string());
         }
     }
-    
+
     unordered_map<string, uint64_t> word_count1, word_count2, word_count3, word_count4;
 
     thread t1(threadReadsBook, 1, std::ref(word_count1), fileNames);
     thread t2(threadReadsBook, 2, std::ref(word_count2), fileNames);
     thread t3(threadReadsBook, 3, std::ref(word_count3), fileNames);
     thread t4(threadReadsBook, 4, std::ref(word_count4), fileNames);
-    
-    t1.join(); t2.join(); t3.join(); t4.join();
 
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+
+    //threadReadsBook( 1, std::ref(word_count1), fileNames);
     //add all words to 1st dictionary; alternatively, I can find the biggest and add to that instead
     cout<<"Finished parsing words in all files\n";
     mergeDicts(word_count1, word_count2, word_count3, word_count4);
@@ -153,7 +161,7 @@ int main() {
     {
         if(it->second == 1)
             it = word_count1.erase(it);
-        else   
+        else
         {
             total_num_words += it->second;
             ++it;
@@ -161,10 +169,13 @@ int main() {
     }
     cout<<"Erased single entries from the main dictionary and found total words:"<<total_num_words<<"\n";
     /*
-     * Finding top most used 300 words in the dictionary 
+     * Finding top most used 300 words in the dictionary
      */
     const uint32_t topK = 300;
     printTopKMostUsedWords(word_count1, topK);
-    cout<<"ALL DONE!\n";
+    cout<<"ALL DONE 4 threads!\n";
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
+    cout<<"Time taken: "<<duration.count()<<" ms"<<endl;
     return 0;
 }
