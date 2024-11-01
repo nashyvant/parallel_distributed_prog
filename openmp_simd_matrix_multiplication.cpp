@@ -8,19 +8,25 @@ using namespace std;
 Compile as: g++ -g -o2 -fopenmp -mavx demo_omp.cpp -o a.exe
 Output of the program for matrix multiplication of N*N where N = 1024:
 Number of threads:8 //on my system, and includes hyperthreading
-Total time taken: 4376ms 
-Total time taken by openmp 2 threads: 2195ms
-Total time taken by openmp 4 threads: 1450ms
-Total time taken by openmp 6 threads: 1286ms
-Total time taken by openmp 8 threads: 1258ms
-Total time taken by openmp SIMD: 1204ms
-With transpose---------------//transpose of B matrix to make use of cache hits and burst modes
-Total time taken: 2575ms
-Total time taken by openmp 2 threads: 1349ms
-Total time taken by openmp 4 threads: 872ms
-Total time taken by openmp 6 threads: 761ms
-Total time taken by openmp 8 threads: 695ms
-Total time taken by openmp SIMD: 672ms
+Total time taken: 10229ms
+Total time taken by openmp 2 threads: 3981ms
+Total time taken by openmp 4 threads: 2312ms
+Total time taken by openmp 6 threads: 1972ms
+Total time taken by openmp 8 threads: 1819ms
+Total time taken by 2 threads with openmp SIMD: 3893ms
+Total time taken by 4 threads with openmp SIMD: 2266ms
+Total time taken by 6 threads with openmp SIMD: 1957ms
+Total time taken by 8 threads with openmp SIMD: 1810ms
+With transpose--------------
+Total time taken: 2663ms
+Total time taken by openmp 2 threads: 1535ms
+Total time taken by openmp 4 threads: 901ms
+Total time taken by openmp 6 threads: 792ms
+Total time taken by openmp 8 threads: 754ms
+Total time taken by 2 threads and with openmp SIMD: 1434ms
+Total time taken by 4 threads and with openmp SIMD: 882ms
+Total time taken by 6 threads and with openmp SIMD: 756ms
+Total time taken by 8 threads and with openmp SIMD: 717ms
 */
 void printmatrix(const float a[], const float b[], const float c[], const int n)
 {
@@ -191,13 +197,17 @@ int main() {
             cout<<"OpenMp has different C matrix! \n";
     }
 
-    start_time = std::chrono::high_resolution_clock::now();
-    multiplymatrix_openmp_simd(a, b, c, n);
-    end_time = std::chrono::high_resolution_clock::now();
-    duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    cout << "Total time taken by openmp SIMD: " << duration_ms.count() << "ms" << endl;
-    if(c != copy_c)
+    for(int i=2; i <= num_threads; i+=2)
+    {
+        omp_set_num_threads(i);
+        start_time = std::chrono::high_resolution_clock::now();
+        multiplymatrix_openmp_simd(a, b, c, n);
+        end_time = std::chrono::high_resolution_clock::now();
+        duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        cout << "Total time taken by "<<i<<" threads with openmp SIMD: " << duration_ms.count() << "ms" << endl;
+        if(c != copy_c)
             cout<<"OpenMp SIMD has different C matrix! \n";
+    }
 
     cout<<"With transpose--------------\n";
     float *bT = b;
@@ -222,13 +232,17 @@ int main() {
             cout<<"Transpose OpenMP has different C matrix! \n";
     }
 
-    start_time = std::chrono::high_resolution_clock::now();
-    matrixMultiplyT_openmp_simd(a, bT, c, n);
-    end_time = std::chrono::high_resolution_clock::now();
-    duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    cout << "Total time taken by openmp SIMD: " << duration_ms.count() << "ms" << endl;
-    if(c != copy_c)
-        cout<<"Transpose OpenMP SIMD has different C matrix! \n";
+    for(int i=2; i <= num_threads; i+=2)
+    {
+        omp_set_num_threads(i);
+        start_time = std::chrono::high_resolution_clock::now();
+        matrixMultiplyT_openmp_simd(a, bT, c, n);
+        end_time = std::chrono::high_resolution_clock::now();
+        duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        cout << "Total time taken by "<< i <<" threads and with openmp SIMD: " << duration_ms.count() << "ms" << endl;
+        if(c != copy_c)
+            cout<<"Transpose OpenMP SIMD has different C matrix! \n";
+    }
 
     delete[] a;
     delete[] b;
